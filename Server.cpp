@@ -32,7 +32,8 @@ Server::Server(QString address)
     mm_ipAaddr = listGeneralAddr[0];
     mm_port = listGeneralAddr[1];
 
-    qDebug() << "Ваши аргументы:";
-    qDebug() << "IP: " << mm_ipAaddr;
-    qDebug() << "Port: " << mm_port;
+    QString message = QString("Server слушает адрес %1:%2")
+            .arg(mm_ipAaddr)
+            .arg(mm_port);
+    qDebug() << message;
 }

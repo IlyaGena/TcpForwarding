@@ -12,6 +12,9 @@ public:
     Server(QString address);
 
 private:
+    void initialize();
+
+private:
     QString mm_ipAaddr;
     QString mm_port;
 };
