@@ -152,6 +152,18 @@ void Client::binaryMessageReceivedServer()
 {
     QByteArray data = mm_socketServer.readAll();
     qDebug() << "Local принял от Server: <" << data << ">";
+
+    mm_socketLocal.write(data);
+    mm_socketLocal.flush();
+}
+
+void Client::binaryMessageReceivedLocal()
+{
+    QTcpSocket *client = static_cast<QTcpSocket*>(sender());
+    QByteArray data = client->readAll();
+
+    qDebug() << "Local принял от Client: <" << data << ">";
+    send(data);
 }
 
 void Client::stateChanged(QAbstractSocket::SocketState state)
@@ -182,13 +194,4 @@ void Client::reConnection()
     // проверка на то, какое сейчас подключение
     if (mm_socketServer.state() != QAbstractSocket::ConnectedState)
         mm_socketServer.connectToHost(mm_ipAddrServer, mm_portServer);
-}
-
-void Client::binaryMessageReceivedLocal()
-{
-    QTcpSocket *client = static_cast<QTcpSocket*>(sender());
-    QByteArray data = client->readAll();
-
-    qDebug() << "Local принял от Client: <" << data << ">";
-    send(data);
 }
