@@ -32,29 +32,22 @@ inline bool checkPort(QStringList listGeneralAddr)
 }
 
 Server::Server(QString address) :
-    mm_socketServer(),
+    mm_server(),
     mm_ipAddrServer(),
     mm_portServer(),
-    mm_ipAddrRemote(),
-    mm_portRemote(),
     mm_timer()
 {
     qDebug() << "Вы запустили сервер";
-
-    ptr_socketRemote = new QTcpSocket();
 
     // парсинг введеных значений
     parsingAddressServer(address);
 
     // запуск сервера
-    mm_socketServer.listen(mm_ipAddrServer, mm_portServer);
+    mm_server.listen(mm_ipAddrServer, mm_portServer);
 
     // соединение сигнал-слот
-    connect(ptr_socketRemote, &QTcpSocket::readyRead,
-            this, &Server::binaryMessageReceivedRemote);
-
-    connect(&mm_socketServer, &QTcpServer::newConnection,
-            this, &Server::newConnection, Qt::QueuedConnection);
+    connect(&mm_server, &QTcpServer::newConnection,
+            this, &Server::newConnectionToServer, Qt::QueuedConnection);
 
     // таймер проверки клиентов
     mm_timer.setInterval(TIMERCOUNT);
@@ -65,23 +58,22 @@ Server::Server(QString address) :
 
 Server::~Server()
 {
-    mm_socketServer.close();
-    ptr_socketRemote->close();
+    mm_server.close();
 }
 
-void Server::newConnection()
+void Server::newConnectionToServer()
 {
     QTcpServer *server = static_cast<QTcpServer*>(sender());
 
     QTcpSocket *client = server->nextPendingConnection();
 
     connect(client, &QTcpSocket::readyRead,
-            this, &Server::binaryMessageReceived);
+            this, &Server::binaryMessageReceivedServer);
 
     connect(client, &QTcpSocket::disconnected,
             this, &Server::disconnected);
 
-    QString message = QString("соединение открыто %1:%2").arg(
+    QString message = QString("<Tunnel> соединение открыто %1:%2").arg(
                 QHostAddress(client->peerAddress().toIPv4Address()).toString(),
                 QString::number(client->peerPort()));
     qDebug() << message;
@@ -89,13 +81,15 @@ void Server::newConnection()
     // добавление указателя на сокет в список контроля keepAlive
     quint64 nowTime = QDateTime::currentSecsSinceEpoch();
     mm_connectedList.insert(client, nowTime);
+
+    mm_forwardList.insert(client, nullptr);
 }
 
 void Server::disconnected()
 {
     QTcpSocket *client = static_cast<QTcpSocket*>(sender());
 
-    QString message = QString("соединение закрыто %1:%2").arg(
+    QString message = QString("<Tunnel> соединение закрыто %1:%2").arg(
                 QHostAddress(client->peerAddress().toIPv4Address()).toString(),
                 QString::number(client->peerPort()));
     qDebug() << message;
@@ -104,12 +98,12 @@ void Server::disconnected()
     mm_connectedList.remove(client);
 }
 
-void Server::binaryMessageReceived()
+void Server::binaryMessageReceivedServer()
 {
     QTcpSocket *client = static_cast<QTcpSocket*>(sender());
     QByteArray data = client->readAll();
 
-    qDebug() << "Server принял от Local: |" << data << "|";
+    qDebug() << "<Tunnel> Принял: |" << data << "|";
 
     // изменяем время последнего сообщения
     auto list = mm_connectedList.keys();
@@ -123,24 +117,48 @@ void Server::binaryMessageReceived()
         }
     }
 
-    if (mm_ipAddrRemote.toString().isEmpty() || mm_portRemote == 0)
+    foreach (auto record, mm_forwardList.keys())
     {
-        if (!parsingAddressRemote(data))
+        if (record != client)
+            continue;
+
+        // генерация нового сервера remote
+        if (mm_forwardList[record] == nullptr)
+        {
+            QHostAddress ipAddrRemote;
+            quint16 portRemote;
+
+            if (!parsingAddressRemote(data, ipAddrRemote, portRemote))
+                return;
+
+            RemoteServer* remoteServer = new RemoteServer(ipAddrRemote, portRemote);
+
+            connect(remoteServer, &RemoteServer::sendDataFromRemote,
+                    this, &Server::sendDataFromRemote);
+
+            mm_forwardList.insert(client, remoteServer);
             return;
-
-        // соединение с адресом проброса
-        ptr_socketRemote->connectToHost(mm_ipAddrRemote, mm_portRemote);
-        return;
+        }
+        // отправка ответа сокету сервера remote
+        else if (mm_forwardList[record] != nullptr)
+        {
+            RemoteServer* server = mm_forwardList.value(record);
+            server->sendDataFromServer(data);
+        }
     }
-
-    ptr_socketRemote->write(data);
-    ptr_socketRemote->flush();
 }
 
-void Server::binaryMessageReceivedRemote()
+void Server::sendDataFromRemote(QByteArray data)
 {
-    QByteArray data = ptr_socketRemote->readAll();
-    qDebug() << "Server принял от Remote: |" << data << "|";
+    RemoteServer *remoteServer = static_cast<RemoteServer*>(sender());
+    foreach(auto record, mm_forwardList.keys())
+    {
+        if(mm_forwardList.value(record) == remoteServer)
+        {
+            record->write(data);
+            record->flush();
+        }
+    }
 }
 
 void Server::keppALive()
@@ -165,7 +183,7 @@ void Server::keppALive()
 
 void Server::parsingAddressServer(QString address)
 {
-    qDebug() << "Начат процесс определения адреса прослушивания...";
+    qDebug() << "<Tunnel> Начат процесс определения адреса прослушивания...";
     QStringList listGeneralAddr = address.split(":");
     QStringList listAddr = listGeneralAddr[0].split(".");
 
@@ -175,27 +193,27 @@ void Server::parsingAddressServer(QString address)
     mm_ipAddrServer = QHostAddress(listGeneralAddr[0]);
     mm_portServer = listGeneralAddr[1].toUInt();
 
-    QString message = QString("Server слушает адрес %1:%2")
+    QString message = QString("<Tunnel> Cлушаю адрес %1:%2")
             .arg(mm_ipAddrServer.toString())
             .arg(mm_portServer);
     qDebug() << message;
 }
 
-bool Server::parsingAddressRemote(QString address)
+bool Server::parsingAddressRemote(QString address, QHostAddress& addressRemote, quint16& port)
 {
-    qDebug() << "Начат процесс определения remote_addr...";
+    qDebug() << "<Tunnel> Начат процесс определения remote_addr...";
     QStringList listGeneralAddr = address.split(":");
     QStringList listAddr = listGeneralAddr[0].split(".");
 
     if (!checkAddres(listGeneralAddr, listAddr) || !checkPort(listGeneralAddr))
         return false;
 
-    mm_ipAddrRemote = QHostAddress(listGeneralAddr[0]);
-    mm_portRemote = listGeneralAddr[1].toUInt();
+    addressRemote = QHostAddress(listGeneralAddr[0]);
+    port = listGeneralAddr[1].toUInt();
 
-    QString message = QString("Server пробрасывает пакеты с адреса %1:%2")
-            .arg(mm_ipAddrRemote.toString())
-            .arg(mm_portRemote);
+    QString message = QString("<Tunnel> Пробрасываю пакеты с адреса %1:%2")
+            .arg(addressRemote.toString())
+            .arg(port);
     qDebug() << message;
     return true;
 }

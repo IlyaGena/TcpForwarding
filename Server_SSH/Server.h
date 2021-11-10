@@ -8,8 +8,11 @@
 #include <QTcpSocket>
 #include <QTcpServer>
 #include <QMap>
+#include <QQueue>
 #include <QDateTime>
 #include <QTimer>
+
+#include "RemoteServer.h"
 
 #define TIMERCOUNT      1000
 #define KEEPALIVE       30
@@ -30,26 +33,23 @@ private slots:
     void disconnected();
 
     /*!
-     * \brief newConnection появилось новое подключение
+     * \brief newConnectionToServer появилось новое подключение на server (от local)
      */
-    void newConnection();
+    void newConnectionToServer();
 
     /*!
-     * \brief binaryMessageReceived приняты данные от local_addr
+     * \brief binaryMessageReceivedServer приняты данные от local_addr
      * \param data данные
      */
-    void binaryMessageReceived();
+    void binaryMessageReceivedServer();
 
-    /*!
-     * \brief binaryMessageReceived приняты данные от remoteAddr
-     * \param data данные
-     */
-    void binaryMessageReceivedRemote();
+    void sendDataFromRemote(QByteArray data);
 
     /*!
      * \brief keppALive проверка списка подкл. клиентов
      */
     void keppALive();
+
 private:
     /*!
      * \brief parsingAddressListen - парсинг адреса server введенного в cmd
@@ -61,20 +61,18 @@ private:
      * \brief parsingAddressRemote - парсинг адреса проброса присланного local_addr
      * \param address - значение от local_addr
      */
-    bool parsingAddressRemote(QString address);
+    bool parsingAddressRemote(QString address, QHostAddress &addressRemote, quint16 &port);
 
 private:
-    QTcpServer                      mm_socketServer;        //!< объект сервера для прослушивания
-    QTcpSocket*                     ptr_socketRemote;       //!< указатель сокета с remoteAddr
+    QTcpServer                      mm_server;              //!< объект сервера для прослушивания
 
     QHostAddress                    mm_ipAddrServer;        //!< адрес server
     quint16                         mm_portServer;          //!< порт server
 
-    QHostAddress                    mm_ipAddrRemote;         //!< адрес remoteAddr
-    quint16                         mm_portRemote;          //!< порт remoteAddr
-
     QMap<QTcpSocket*, quint64>      mm_connectedList;       //!< внутренний лист подключений для поддержания сессий
     QTimer                          mm_timer;               //!< таймер для keepALive
+
+    QMap<QTcpSocket*, RemoteServer*> mm_forwardList;
 };
 
 #endif // SERVER_H
