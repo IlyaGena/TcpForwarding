@@ -5,8 +5,14 @@
 #include <QDebug>
 #include <QString>
 #include <QHostAddress>
-#include <QWebSocketServer>
-#include <QWebSocket>
+#include <QTcpSocket>
+#include <QTcpServer>
+#include <QMap>
+#include <QDateTime>
+#include <QTimer>
+
+#define TIMERCOUNT      1000
+#define KEEPALIVE       30
 
 class Server : public QObject
 {
@@ -14,45 +20,61 @@ class Server : public QObject
 public:
     Server(QString address);
 
+    ~Server();
+
 private slots:
-    /*!
-     * \brief newConnection появилось новое подключение
-     */
-    void newConnection();
-
-    /*!
-     * \brief acceptError сетевая ошибка при создании нового подключения
-     * \param socketError тип ошибки
-     */
-    void acceptError(QAbstractSocket::SocketError socketError);
-
-    /*!
-     * \brief serverError ошибка сервера
-     * \param closeCode тип ошибки
-     */
-    void serverError(QWebSocketProtocol::CloseCode closeCode);
-
-    /*!
-     * \brief binaryMessageReceived приняты данные от клиента
-     * \param data данные
-     */
-    void binaryMessageReceived(const QByteArray &data);
-
-    /*!
-     * \brief aboutToClose клиент отключается
-     */
-    void aboutToClose();
 
     /*!
      * \brief disconnected клиент отключился
      */
     void disconnected();
 
+    /*!
+     * \brief newConnection появилось новое подключение
+     */
+    void newConnection();
+
+    /*!
+     * \brief binaryMessageReceived приняты данные от local_addr
+     * \param data данные
+     */
+    void binaryMessageReceived();
+
+    /*!
+     * \brief binaryMessageReceived приняты данные от remoteAddr
+     * \param data данные
+     */
+    void binaryMessageReceivedRemote();
+
+    /*!
+     * \brief keppALive проверка списка подкл. клиентов
+     */
+    void keppALive();
 private:
-    QWebSocketServer mm_server;
-    QHostAddress mm_ipAaddr;
-    quint16 mm_port;
-    QList<QWebSocket*> mm_connectedList;    //!< внутренний лист подключений для поддержания сессий
+    /*!
+     * \brief parsingAddressListen - парсинг адреса server введенного в cmd
+     * \param address - значение из cmd
+     */
+    void parsingAddressServer(QString address);
+
+    /*!
+     * \brief parsingAddressRemote - парсинг адреса проброса присланного local_addr
+     * \param address - значение от local_addr
+     */
+    bool parsingAddressRemote(QString address);
+
+private:
+    QTcpServer                      mm_socketServer;        //!< объект сервера для прослушивания
+    QTcpSocket*                     ptr_socketRemote;       //!< указатель сокета с remoteAddr
+
+    QHostAddress                    mm_ipAddrServer;        //!< адрес server
+    quint16                         mm_portServer;          //!< порт server
+
+    QHostAddress                    mm_ipAddrRemote;         //!< адрес remoteAddr
+    quint16                         mm_portRemote;          //!< порт remoteAddr
+
+    QMap<QTcpSocket*, quint64>      mm_connectedList;       //!< внутренний лист подключений для поддержания сессий
+    QTimer                          mm_timer;               //!< таймер для keepALive
 };
 
 #endif // SERVER_H
