@@ -1,7 +1,9 @@
 #include "Test.h"
 
 Test::Test(QString port):
-    mm_server(this)
+    mm_server(this),
+    cout(stdout),
+    cin(stdin)
 {
     // соединение сигнал-слот
     connect(&mm_server, &QTcpServer::newConnection,
@@ -25,4 +27,7 @@ void Test::binaryMessageReceivedServer()
 {
     QTcpSocket *client = static_cast<QTcpSocket*>(sender());
     qDebug() << "Пришло: " << client->readAll();
+    auto ask = cin.readLine();
+    client->write(ask.toUtf8());
+    client->flush();
 }

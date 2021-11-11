@@ -5,6 +5,7 @@
 #include <QHostAddress>
 #include <QTcpServer>
 #include <QTcpSocket>
+#include <QString>
 
 class Test : public QObject
 {
@@ -26,6 +27,9 @@ private slots:
 private:
     QTcpServer      mm_server;
     QTcpSocket*     mm_client;
+
+    QTextStream cout;
+    QTextStream cin;
 };
 
 #endif // TEST_H
