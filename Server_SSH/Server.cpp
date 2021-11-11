@@ -96,6 +96,13 @@ void Server::disconnected()
 
     // удаление сокета из списка контроля keepAlive
     mm_connectedList.remove(client);
+
+    if (mm_forwardList.contains(client))
+    {
+        auto remoteSrv = mm_forwardList[client];
+        remoteSrv->getServer()->close();
+        mm_forwardList.remove(client);
+    }
 }
 
 void Server::binaryMessageReceivedServer()
@@ -177,6 +184,13 @@ void Server::keppALive()
         {
             record->close();
             mm_connectedList.remove(record);
+
+            if (mm_forwardList.contains(record))
+            {
+                auto remoteSrv = mm_forwardList[record];
+                remoteSrv->getServer()->close();
+                mm_forwardList.remove(record);
+            }
         }
     }
 }

@@ -56,7 +56,7 @@ Client::Client(QString cmd, QString addrServer) :
     mm_socketServer.connectToHost(mm_ipAddrServer, mm_portServer);
 
     // отправляем данные о клиенте
-    send(mm_ipAddrRemote.toString().toUtf8() + ":" + QString::number(mm_portRemote).toUtf8());
+    mm_remoteAddress = mm_ipAddrRemote.toString().toUtf8() + ":" + QString::number(mm_portRemote).toUtf8();
 
     // таймер переподключения
     mm_timer.setInterval(RECONNECT);
@@ -126,7 +126,6 @@ void Client::parsingAddresses(QString cmd)
 
     mm_ipAddrLocal = QHostAddress(listGeneralAddr[2]);
     mm_portLocal = listGeneralAddr[3].toInt();
-    mm_urlLocal = QUrl("ws://" + mm_ipAddrLocal.toString() + ":" + QString::number(mm_portLocal));
 
     mm_socketLocal.connectToHost(mm_ipAddrLocal, mm_portLocal);
 
@@ -185,7 +184,10 @@ void Client::stateChanged(QAbstractSocket::SocketState state)
 
     // если подключение появилось
     if (state == QAbstractSocket::ConnectedState)
+    {
+        send(mm_remoteAddress);
         mm_timer.stop();
+    }
 }
 
 void Client::reConnection()

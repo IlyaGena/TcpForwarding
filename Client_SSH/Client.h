@@ -67,14 +67,15 @@ private:
 
     QHostAddress                    mm_ipAddrLocal;         //!< адрес ресура
     quint16                         mm_portLocal;           //!< порт ресура
-    QUrl                            mm_urlLocal;            //!< url ресура
 
     QHostAddress                    mm_ipAddrRemote;        //!< адрес клиента
     quint16                         mm_portRemote;          //!< порт клиента
 
     QTimer                          mm_timer;               //!< таймер переподключения
     QList<QByteArray>               mm_queue;               //!< очередь сообщений
-    QTimer                          tmp_timer;               //!< таймер переподключения
+    QTimer                          tmp_timer;              //!< таймер переподключения
+
+    QByteArray                      mm_remoteAddress;       //!< данные для сервера
 };
 
 #endif // CLIENT_H
