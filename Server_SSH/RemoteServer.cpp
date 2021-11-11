@@ -16,6 +16,9 @@ QTcpServer *RemoteServer::getServer()
 
 void RemoteServer::sendDataFromServer(QByteArray data)
 {
+    if (mm_queue.isEmpty())
+        return;
+
     auto tcpSocket = mm_queue.dequeue();
     tcpSocket->write(data);
     tcpSocket->flush();
