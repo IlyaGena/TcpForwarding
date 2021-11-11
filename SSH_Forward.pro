@@ -6,7 +6,8 @@ CONFIG -= app_bundle
 
 SUBDIRS += \
     Client_SSH \
-    Server_SSH
+    Server_SSH \
+    testSSH
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
