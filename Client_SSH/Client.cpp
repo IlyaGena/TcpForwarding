@@ -32,10 +32,11 @@ inline bool checkPort(QStringList listGeneralAddr)
 }
 
 Client::Client(QString cmd, QString addrServer) :
-    mm_socketServer(this),
-    mm_socketLocal(this),
-    mm_timer(this)
+    mm_timer(this),
+    mm_timerClient(this)
 {
+    ptr_socketServer = new QSslSocket();
+    ptr_socketLocal = new QTcpSocket();
     qDebug() << "Вы запустили клиент";
 
     // парсинг введеных значений
@@ -43,30 +44,35 @@ Client::Client(QString cmd, QString addrServer) :
     parsingAddresses(cmd);
 
     // соединение сигнал-слот
-    connect(&mm_socketLocal, &QTcpSocket::readyRead,
+    connect(ptr_socketLocal, &QTcpSocket::readyRead,
             this, &Client::binaryMessageReceivedLocal);
 
-    connect(&mm_socketServer, &QTcpSocket::readyRead,
+    connect(ptr_socketLocal, &QTcpSocket::stateChanged,
+            this, &Client::stateChangedClient);
+
+    connect(ptr_socketServer, &QTcpSocket::readyRead,
             this, &Client::binaryMessageReceivedServer);
 
-    connect(&mm_socketServer, &QTcpSocket::stateChanged,
+    connect(ptr_socketServer, &QTcpSocket::stateChanged,
             this, &Client::stateChanged);
 
     // открытие соединение с сервером
-    mm_socketServer.connectToHost(mm_ipAddrServer, mm_portServer);
+    ptr_socketServer->connectToHost(mm_ipAddrServer, mm_portServer);
 
     // отправляем данные о клиенте
     mm_remoteAddress = mm_ipAddrRemote.toString().toUtf8() + ":" + QString::number(mm_portRemote).toUtf8();
 
     // таймер переподключения
     mm_timer.setInterval(RECONNECT);
+    mm_timerClient.setInterval(RECONNECT);
     connect(&mm_timer, &QTimer::timeout, this, &Client::reConnection);
+    connect(&mm_timerClient, &QTimer::timeout, this, &Client::reConnectionClient);
 }
 
 Client::~Client()
 {
-    mm_socketServer.close();
-    mm_socketLocal.close();
+    ptr_socketServer->close();
+    ptr_socketLocal->close();
 }
 
 void Client::parsingAddressServer(QString address)
@@ -80,7 +86,6 @@ void Client::parsingAddressServer(QString address)
 
     mm_ipAddrServer = QHostAddress(listGeneralAddr[0]);
     mm_portServer = listGeneralAddr[1].toUInt();
-    mm_urlServer = QUrl("ws://" + mm_ipAddrServer.toString() + ":" + QString::number(mm_portServer));
 
     QString message = QString("Server определен по адресу %1:%2")
             .arg(mm_ipAddrServer.toString())
@@ -127,7 +132,7 @@ void Client::parsingAddresses(QString cmd)
     mm_ipAddrLocal = QHostAddress(listGeneralAddr[2]);
     mm_portLocal = listGeneralAddr[3].toInt();
 
-    mm_socketLocal.connectToHost(mm_ipAddrLocal, mm_portLocal);
+    ptr_socketLocal->connectToHost(mm_ipAddrLocal, mm_portLocal);
 
     message = QString("Local определен по адресу %1:%2")
             .arg(mm_ipAddrLocal.toString())
@@ -137,23 +142,23 @@ void Client::parsingAddresses(QString cmd)
 
 void Client::send(QByteArray data)
 {
-    if (mm_socketServer.state() != QAbstractSocket::ConnectedState)
+    if (ptr_socketServer->state() != QAbstractSocket::ConnectedState)
     {
         mm_queue.append(data);
         return;
     }
 
-    mm_socketServer.write(data);
-    mm_socketServer.flush();
+    ptr_socketServer->write(data);
+    ptr_socketServer->flush();
 }
 
 void Client::binaryMessageReceivedServer()
 {
-    QByteArray data = mm_socketServer.readAll();
+    QByteArray data = ptr_socketServer->readAll();
     qDebug() << "Local принял от Server: <" << data << ">";
 
-    mm_socketLocal.write(data);
-    mm_socketLocal.flush();
+    ptr_socketLocal->write(data);
+    ptr_socketLocal->flush();
 }
 
 void Client::binaryMessageReceivedLocal()
@@ -161,7 +166,7 @@ void Client::binaryMessageReceivedLocal()
     QTcpSocket *client = static_cast<QTcpSocket*>(sender());
     QByteArray data = client->readAll();
 
-    qDebug() << "Local принял от Client: <" << data << ">";
+    qDebug() << "Local принял от Client: <>";
     send(data);
 }
 
@@ -172,8 +177,8 @@ void Client::stateChanged(QAbstractSocket::SocketState state)
         while (!mm_queue.isEmpty())
         {
             auto data = mm_queue.first();
-            mm_socketServer.write(data);
-            mm_socketServer.flush();
+            ptr_socketServer->write(data);
+            ptr_socketServer->flush();
 
             mm_queue.removeFirst();
         }
@@ -190,10 +195,29 @@ void Client::stateChanged(QAbstractSocket::SocketState state)
     }
 }
 
+void Client::stateChangedClient(QAbstractSocket::SocketState state)
+{
+    // если подключения нет
+    if (state == QAbstractSocket::UnconnectedState && !mm_timer.isActive())
+        mm_timerClient.start();
+
+    // если подключение появилось
+    if (state == QAbstractSocket::ConnectedState)
+        mm_timerClient.stop();
+}
+
 void Client::reConnection()
 {
     qDebug() << "Connecting to server...";
     // проверка на то, какое сейчас подключение
-    if (mm_socketServer.state() != QAbstractSocket::ConnectedState)
-        mm_socketServer.connectToHost(mm_ipAddrServer, mm_portServer);
+    if (ptr_socketServer->state() != QAbstractSocket::ConnectedState)
+        ptr_socketServer->connectToHost(mm_ipAddrServer, mm_portServer);
+}
+
+void Client::reConnectionClient()
+{
+    qDebug() << "Connecting to Client...";
+    // проверка на то, какое сейчас подключение
+    if (ptr_socketLocal->state() != QAbstractSocket::ConnectedState)
+        ptr_socketLocal->connectToHost(mm_ipAddrLocal, mm_portLocal);
 }

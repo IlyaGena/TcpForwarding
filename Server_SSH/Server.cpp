@@ -110,7 +110,7 @@ void Server::binaryMessageReceivedServer()
     QTcpSocket *client = static_cast<QTcpSocket*>(sender());
     QByteArray data = client->readAll();
 
-    qDebug() << "<Tunnel> Принял: |" << data << "|";
+    qDebug() << "<Tunnel> Принял: ||";
 
     // изменяем время последнего сообщения
     auto list = mm_connectedList.keys();

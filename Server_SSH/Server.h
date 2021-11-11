@@ -6,7 +6,7 @@
 #include <QString>
 #include <QHostAddress>
 #include <QTcpSocket>
-#include <QTcpServer>
+#include <QSslSocket>
 #include <QMap>
 #include <QQueue>
 #include <QDateTime>
@@ -15,7 +15,7 @@
 #include "RemoteServer.h"
 
 #define TIMERCOUNT      1000
-#define KEEPALIVE       30
+#define KEEPALIVE       350
 
 class Server : public QObject
 {

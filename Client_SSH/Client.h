@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QString>
 #include <QTcpSocket>
+#include <QSslSocket>
 #include <QHostAddress>
 #include <QDebug>
 #include <QTimer>
@@ -52,18 +53,25 @@ private slots:
      */
     void stateChanged(QAbstractSocket::SocketState state);
     /*!
+     * \brief stateChanged - изменение состояния сокета server
+     * \param state - состояние
+     */
+    void stateChangedClient(QAbstractSocket::SocketState state);
+    /*!
      * \brief reConnection - изменить состояние сокета server
      */
     void reConnection();
+    /*!
+     * \brief reConnection - изменить состояние сокета server
+     */
+    void reConnectionClient();
 
 private:
-    QTcpSocket                      tmp_socketResource;         //!< сокет до ресура
-    QTcpSocket                      mm_socketServer;        //!< сокет до сервера
-    QTcpSocket                      mm_socketLocal;         //!< сокет до ресура
+    QSslSocket*                     ptr_socketServer;       //!< сокет до сервера
+    QTcpSocket*                     ptr_socketLocal;        //!< сокет до ресура
 
     QHostAddress                    mm_ipAddrServer;        //!< адрес сервера
     quint16                         mm_portServer;          //!< порт сервера
-    QUrl                            mm_urlServer;           //!< url сервера
 
     QHostAddress                    mm_ipAddrLocal;         //!< адрес ресура
     quint16                         mm_portLocal;           //!< порт ресура
@@ -72,8 +80,8 @@ private:
     quint16                         mm_portRemote;          //!< порт клиента
 
     QTimer                          mm_timer;               //!< таймер переподключения
+    QTimer                          mm_timerClient;         //!< таймер переподключения к ресурсу
     QList<QByteArray>               mm_queue;               //!< очередь сообщений
-    QTimer                          tmp_timer;              //!< таймер переподключения
 
     QByteArray                      mm_remoteAddress;       //!< данные для сервера
 };
